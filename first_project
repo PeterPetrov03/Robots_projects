@@ -1,0 +1,25 @@
+int led = 9;
+int process_time=10000;
+int max_light=255;
+int min_light=0;
+float calculated_time = process_time/max_light;
+void setup() 
+{
+  pinMode(led, OUTPUT);
+  for(int light=0; light < max_light; light++)
+  {
+    analogWrite(led, light);
+    delay(calculated_time);
+  }
+  delay(5000);
+  for(int light=255; light > min_light; light--)
+  {
+    analogWrite(led, light);
+    delay(calculated_time);
+  }
+}
+
+// the loop routine runs over and over again forever:
+void loop() 
+{
+}
