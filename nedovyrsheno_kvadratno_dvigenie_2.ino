@@ -1,133 +1,276 @@
 /*
-  Fade
+Robot Car with Speed Sensor Demonstration
+RobotCarSpeedSensorDemo.ino
+Demonstrates use of Hardware Interrupts
+to control motors on Robot Car
 
-  This example shows how to fade an LED on pin 9 using the analogWrite()
-  function.
-
-  The analogWrite() function uses PWM, so if you want to change the pin you're
-  using, be sure to use another PWM capable pin. On most Arduino, the PWM pins
-  are identified with a "~" sign, like ~3, ~5, ~6, ~9, ~10 and ~11.
-
-  This example code is in the public domain.
-
-  http://www.arduino.cc/en/Tutorial/Fade
+DroneBot Workshop 2017
+http://dronebotworkshop.com
 */
 
-#define LEFT_MOTOR 5 /*сетваме кой порт ще използваме*/
-#define RIGHT_MOTOR 6 /*сетваме кой порт ще използваме*/
-#define LEFT_MOTOR_DIR 4 /*сетваме кой порт ще използваме*/
-#define RIGHT_MOTOR_DIR 7 /*сетваме кой порт ще използваме*/
-#define encoder0PinA  2
-#define encoder0PinB  3
+// Constants for Interrupt Pins
+// Change values if not using Arduino Uno
 
-unsigned int encoder0Pos=0;
-int newposition;
-int oldposition;
-int newtime;
-int oldtime;
-int process_time=5000;/*правим си променлижа за цялото време или с други думи тожа ни е променливата която ни държи цялото време*/
-int max_speed=255;/*определяме колко е маскималната ни светлина(в случая иначе може да бъде всичко) до която може да стигне обекта*/
-float vel;
-uint16_t prtime;
+const byte MOTOR_A = 3;  // Motor 2 Interrupt Pin - INT 1 - Right Motor
+const byte MOTOR_B = 2;  // Motor 1 Interrupt Pin - INT 0 - Left Motor
 
-uint16_t toSpeed(uint16_t path, uint16_t timee) 
+						 // Constant for steps in disk
+const float stepcount = 20.00;  // 20 Slots in disk, change if different
+
+								// Constant for wheel diameter
+const float wheeldiameter = 66.10; // Wheel diameter in millimeters, change if different
+
+								   // Integers for pulse counters
+volatile int counter_A = 0;
+volatile int counter_B = 0;
+
+
+// Motor A
+
+int enA = 5;
+int in1 = 4;
+
+// Motor B
+
+int enB = 6;
+int in2 = 7;
+
+// Interrupt Service Routines
+
+// Motor A pulse count ISR
+void ISR_countA()
 {
-  //uint16_t prtime=path/velocity;
-  return (path/timee)/2; 
+	counter_A++;  // increment Motor A counter value
 }
 
-uint16_t toPath(uint16_t timee, uint16_t sped)
+// Motor B pulse count ISR
+void ISR_countB()
 {
-  return sped*timee;
+	counter_B++;  // increment Motor B counter value
 }
 
-uint16_t moove(uint16_t velocity)
-{
-  analogWrite(LEFT_MOTOR, 0);
-  analogWrite(RIGHT_MOTOR, 0);
+// Function to convert from centimeters to steps
+int CMtoSteps(float cm) {
 
-  if(velocity>0)
-  {
-    digitalWrite(LEFT_MOTOR_DIR, HIGH);
-    digitalWrite(RIGHT_MOTOR_DIR, HIGH);
-  } else if(velocity<0) {
-    velocity = velocity*-1;
-    digitalWrite(LEFT_MOTOR_DIR, LOW);
-    digitalWrite(RIGHT_MOTOR_DIR, LOW);
-    
-  } else {
-    analogWrite(LEFT_MOTOR, 0);
-    analogWrite(RIGHT_MOTOR, 0);
-  }
-  
+	int result;  // Final calculation result
+	float circumference = (wheeldiameter * 3.14) / 10; // Calculate wheel circumference in cm
+	float cm_step = circumference / stepcount;  // CM per Step
 
-  analogWrite(LEFT_MOTOR, velocity);
-  analogWrite(RIGHT_MOTOR, velocity);
+	float f_result = cm / cm_step;  // Calculate result as a float
+	result = (int)f_result; // Convert to an integer (note this is NOT rounded)
+
+	return result;  // End and return result
+
 }
 
-uint16_t cross_moove(uint16_t velocity, uint16_t velocity_2)
+// Function to Move Forward
+void MoveForward(int steps, int mspeed)
 {
-  analogWrite(LEFT_MOTOR, 0);
-  analogWrite(RIGHT_MOTOR, 0);
+		analogWrite(enA, 0);
+		analogWrite(enB, 0);
 
-  if(velocity>0 && velocity_2<0)
-  {
-    digitalWrite(LEFT_MOTOR_DIR, HIGH);
-    digitalWrite(RIGHT_MOTOR_DIR, LOW);
-  } else if(velocity>0 && velocity_2==0) {
-    velocity = velocity*-1;
-    digitalWrite(LEFT_MOTOR_DIR, HIGH);
-    digitalWrite(RIGHT_MOTOR_DIR, 0);
-    
-  } else if(velocity<0 && velocity_2>0) {
-    velocity = velocity*-1;
-    digitalWrite(LEFT_MOTOR_DIR, LOW);
-    digitalWrite(RIGHT_MOTOR_DIR, HIGH);
-    
-  } else if(velocity==0 && velocity_2>0) {
-    velocity = velocity*-1;
-    digitalWrite(LEFT_MOTOR_DIR, 0);
-    digitalWrite(RIGHT_MOTOR_DIR, HIGH);
-    
-  } else {
-    analogWrite(LEFT_MOTOR, 0);
-    analogWrite(RIGHT_MOTOR, 0);
-  }
-  
-  analogWrite(LEFT_MOTOR, velocity);
-  analogWrite(RIGHT_MOTOR, velocity);
-  delay(prtime);
+		if (mspeed>0)
+		{
+			digitalWrite(in1, HIGH);
+			digitalWrite(in2, HIGH);
+		}
+		else if (mspeed<0) {
+			mspeed = mspeed*-1;
+			digitalWrite(in1, LOW);
+			digitalWrite(in2, LOW);
+
+		}
+		else {
+			analogWrite(enA, 0);
+			analogWrite(enB, 0);
+		}
+
+
+		analogWrite(enA, mspeed);
+		analogWrite(enB, mspeed);
+		while (steps > counter_A && steps > counter_B) {
+
+		if (steps > counter_A) {
+			analogWrite(enA, mspeed);
+		}
+		else {
+			analogWrite(enA, 0);
+		}
+		if (steps > counter_B) {
+			analogWrite(enB, mspeed);
+		}
+		else {
+			analogWrite(enB, 0);
+		}
+	}
+
+	// Stop when done
+	analogWrite(enA, 0);
+	analogWrite(enB, 0);
+	counter_A = 0;  //  reset counter A to zero
+	counter_B = 0;  //  reset counter B to zero 
+
 }
 
-void doEncoder() 
+// Function to Move in Reverse
+void MoveReverse(int steps, int mspeed, int mspeed2)
 {
-  if (digitalRead(encoder0PinA) == digitalRead(encoder0PinB)) {
-    encoder0Pos++;
-  } else {
-    encoder0Pos--;
-  }
+	counter_A = 0;  //  reset counter A to zero
+	counter_B = 0;  //  reset counter B to zero
+	analogWrite(enA, 0);
+	analogWrite(enB, 0);
 
-  Serial.println (encoder0Pos, DEC);
+	if (mspeed>0 && mspeed2<0)
+	{
+		digitalWrite(in1, HIGH);
+		digitalWrite(in2, LOW);
+	}
+	else if (mspeed>0 && mspeed2 == 0) {
+		digitalWrite(in1, HIGH);
+		digitalWrite(in2, 0);
+
+	}
+	else if (mspeed<0 && mspeed2>0) {
+		mspeed = mspeed*-1;
+		digitalWrite(in1, LOW);
+		digitalWrite(in2, HIGH);
+
+	}
+	else if (mspeed == 0 && mspeed2>0) {
+		mspeed = mspeed*-1;
+		digitalWrite(in1, 0);
+		digitalWrite(in2, HIGH);
+
+	}
+	else {
+		analogWrite(enA, 0);
+		analogWrite(enB, 0);
+	}
+
+	// Go in reverse until step value is reached
+	while (steps > counter_A && steps > counter_B) {
+
+		if (steps > counter_A) {
+			analogWrite(enA, mspeed);
+		}
+		else {
+			analogWrite(enA, 0);
+		}
+		if (steps > counter_B) {
+			analogWrite(enB, mspeed);
+		}
+		else {
+			analogWrite(enB, 0);
+		}
+	}
+
+	// Stop when done8  
+	analogWrite(enA, 0);
+	analogWrite(enB, 0);
+	counter_A = 0;  //  reset counter A to zero
+	counter_B = 0;  //  reset counter B to zero 
+
 }
 
-void setup() /*В този случай пищем задачата в сетъпа защото искаме да се изпълни само веднъж кода ни; ако искахме да се изпълняжа много пъти или безкрайно го пишем във луупа защото той е нещо като безкраен цикъл, като стигне до последния ред започва отножо от първия в луупа*/
+// Function to Spin Right
+void SpinRight(int steps, int mspeed, int mspeed2)
 {
-  pinMode(LEFT_MOTOR_DIR, OUTPUT); 
-  pinMode(RIGHT_MOTOR_DIR, OUTPUT); 
-  pinMode(LEFT_MOTOR, OUTPUT); 
-  pinMode(RIGHT_MOTOR, OUTPUT); 
-  pinMode(encoder0PinA, INPUT);
-  pinMode(encoder0PinB, INPUT); 
-  digitalWrite(encoder0PinB, HIGH);       // turn on pullup resistor
-  attachInterrupt(0, doEncoder, RISING);  // encoDER ON PIN 2
-  Serial.begin (9600);
-  Serial.println("start"); 
+	counter_A = 0;  //  reset counter A to zero
+	counter_B = 0;  //  reset counter B to zero
+
+					// Set Motor A reverse
+	digitalWrite(in1, LOW);
+	digitalWrite(in2, HIGH);
+
+	// Go until step value is reached
+	while (steps > counter_A && steps > counter_B) {
+
+		if (steps > counter_A) {
+			analogWrite(enA, mspeed);
+		}
+		else {
+			analogWrite(enA, 0);
+		}
+		if (steps > counter_B) {
+			analogWrite(enB, mspeed2);
+		}
+		else {
+			analogWrite(enB, 0);
+		}
+	}
+
+	// Stop when done
+	analogWrite(enA, 0);
+	analogWrite(enB, 0);
+	counter_A = 0;  //  reset counter A to zero
+	counter_B = 0;  //  reset counter B to zero 
+
 }
 
-void loop() 
+// Function to Spin Left
+void SpinLeft(int steps, int mspeed, int mspeed2)
 {
-  for(int i=0; i<process_time; i++)
-  {
-    moove(200);
-  }
+	counter_A = 0;  //  reset counter A to zero
+	counter_B = 0;  //  reset counter B to zero
+
+					// Set Motor A forward
+	digitalWrite(in1, HIGH);
+	digitalWrite(in2, LOW);
+
+	// Go until step value is reached
+	while (steps > counter_A && steps > counter_B) {
+
+		if (steps > counter_A) {
+			analogWrite(enA, mspeed);
+		}
+		else {
+			analogWrite(enA, 0);
+		}
+		if (steps > counter_B) {
+			analogWrite(enB, mspeed2);
+		}
+		else {
+			analogWrite(enB, 0);
+		}
+	}
+
+	// Stop when done
+	analogWrite(enA, 0);
+	analogWrite(enB, 0);
+	counter_A = 0;  //  reset counter A to zero
+	counter_B = 0;  //  reset counter B to zero 
+
+}
+
+void setup()
+{
+	// Attach the Interrupts to their ISR's
+	attachInterrupt(digitalPinToInterrupt(MOTOR_A), ISR_countA, RISING);  // Increase counter A when speed sensor pin goes High
+	attachInterrupt(digitalPinToInterrupt(MOTOR_B), ISR_countB, RISING);  // Increase counter B when speed sensor pin goes High
+
+																		  // Test Motor Movement  - Experiment with your own sequences here  
+
+	MoveForward(CMtoSteps(50), 255);  // Forward half a metre at 255 speed
+	delay(1000);  // Wait one second
+	MoveReverse(10, 255, 255);  // Reverse 10 steps at 255 speed
+	delay(1000);  // Wait one second
+	MoveForward(10, 150);  // Forward 10 steps at 150 speed
+	delay(1000);  // Wait one second
+	MoveReverse(CMtoSteps(25.4), 200, 200);  // Reverse 25.4 cm at 200 speed
+	delay(1000);  // Wait one second
+	SpinRight(20, -255, 255);  // Spin right 20 steps at 255 speed
+	delay(1000);  // Wait one second
+	SpinLeft(60, 175, -175);  // Spin left 60 steps at 175 speed
+	delay(1000);  // Wait one second
+	MoveForward(1, 255);  // Forward 1 step at 255 speed
+
+
+}
+
+
+void loop()
+{
+	// Put whatever you want here!
+
+
 }
