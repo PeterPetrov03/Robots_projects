@@ -1,0 +1,88 @@
+/*
+Optical Sensor Two Motor Demonstration
+DualMotorSpeedDemo.ino
+Demonstrates use of Hardware Interrupts
+to measure speed from two motors
+DroneBot Workshop 2017
+http://dronebotworkshop.com
+*/
+
+// Include the TimerOne Library from Paul Stoffregen
+#include<TimerOne.h>
+
+// Constants for Interrupt Pins
+// Change values if not using Arduino Uno
+#define LEFT_MOTOR 5
+#define RIGHT_MOTOR 6
+#define LEFT_MOTOR_DIR 4
+#define RIGHT_MOTOR_DIR 7 
+#define MOTOR_LEFT 2  // Motor 1 Interrupt Pin - INT 0
+#define MOTOR_RIGHT 3  // Motor 2 Interrupt Pin - INT 1
+#define TIMER_ONE_VALUE 1000000
+#define SERIAL_BAUD_RATE 9600
+						
+
+
+unsigned int counter1 = 0;
+unsigned int counter2 = 0;
+
+// Float for number of slots in encoder disk
+float diskslots = 20;  // Change to match value of encoder disk
+
+					   // Interrupt Service Routines
+
+					   // Motor 1 pulse count ISR
+void ISR_cnt_left_motor()
+{
+	counter1++;  // increment Motor 1 counter value
+}
+
+// Motor 2 pulse count ISR
+void ISR_cnt_right_motor()
+{
+	counter2++;  // increment Motor 2 counter value
+}
+
+// TimerOne ISR
+void ISR_timerone()
+{
+	Timer1.detachInterrupt();  // Stop the timer
+	Serial.print("Motor Speed 1: ");
+	float rotation1 = (counter1 / diskslots) * 60.00;  // calculate RPM for Motor 1
+	Serial.print(rotation1);
+	Serial.print(" RPM - ");
+	counter1 = 0;  //  reset counter to zero
+	Serial.print("Motor Speed 2: ");
+	float rotation2 = (counter2 / diskslots) * 60.00;  // calculate RPM for Motor 2
+	Serial.print(rotation2);
+	Serial.println(" RPM");
+	counter2 = 0;  //  reset counter to zero
+	Timer1.attachInterrupt(ISR_timerone);  // Enable the timer
+}
+
+void setup()
+{
+	pinMode(LEFT_MOTOR_DIR, OUTPUT);
+	pinMode(RIGHT_MOTOR_DIR, OUTPUT);
+	pinMode(LEFT_MOTOR, OUTPUT);
+	pinMode(RIGHT_MOTOR, OUTPUT);
+	pinMode(MOTOR_LEFT, INPUT);
+	pinMode(MOTOR_RIGHT, INPUT);
+
+	Serial.begin(SERIAL_BAUD_RATE);
+
+	Timer1.initialize(TIMER_ONE_VALUE); // set timer for 1sec
+	attachInterrupt(digitalPinToInterrupt(MOTOR_LEFT), ISR_cnt_left_motor, RISING);  // Increase counter 1 when speed sensor pin goes High
+	attachInterrupt(digitalPinToInterrupt(MOTOR_RIGHT), ISR_cnt_right_motor, RISING);  // Increase counter 2 when speed sensor pin goes High
+	Timer1.attachInterrupt(ISR_timerone); // Enable the timer
+	digitalWrite(LEFT_MOTOR_DIR, HIGH);
+	digitalWrite(RIGHT_MOTOR_DIR, HIGH);
+	analogWrite(LEFT_MOTOR, 100);
+	analogWrite(RIGHT_MOTOR, 100);
+}
+
+void loop()
+{
+	// Nothing in the loop!
+	// You can place code here
+}
